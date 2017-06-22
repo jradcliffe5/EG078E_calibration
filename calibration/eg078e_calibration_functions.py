@@ -325,7 +325,7 @@ def applydelays(uvdata,disk,refant,bpass,phase_cal,target):
     clcal = AIPSTask('CLCAL')
     clcal.indata = uvdata
     clcal.calsour[1] = phase_cal[1]
-    clcal.sources[1:] = target[0], phase_cal[1]
+    clcal.sources[1] = target[0]
     clcal.antennas[1] = 12
     clcal.invers = get_tab(uvdata,'SN')
     clcal.snver  = get_tab(uvdata,'SN')
@@ -442,6 +442,7 @@ def bpass(uvdata,bandpass,refant,disk):
             uvdata.zap_table('PL',j)
 
 def primary_calibrator(uvdata,phase_cal,disk,refant):
+    ## Derive phases & rates for all other telescopes on first phase cal makes SN8
     fring = AIPSTask('FRING')
     fring.indata = uvdata
     fring.calsour[1] = phase_cal[0]
@@ -457,23 +458,97 @@ def primary_calibrator(uvdata,phase_cal,disk,refant):
     fring.snver = get_tab(uvdata,'SN')+1
     fring.search[1:]=11,12
     fring.go()
+    ### Derive initial phases and rates for JB on second phase cal makes SN9 (edited with snedt)
+    fring = AIPSTask('FRING')
+    fring.indata = uvdata
+    fring.calsour[1] = phase_cal[1]
+    fring.dofit[1] = 12
+    fring.docalib = 2
+    fring.gainuse = get_tab(uvdata,'CL')
+    fring.refant = refant
+    fring.solint = 2
+    fring.weightit = 1
+    fring.aparm[1:] = 3,0,0,0,1,0,0,0,1
+    fring.dparm[1:]= 1,100,5,1,0,0,0,2
+    fring.snver = get_tab(uvdata,'SN')+1
+    fring.search[1:]=11,12
+    fring.go()
     optype = ['PHAS','RATE']
-    for i in optype:
-        snplt = AIPSTask('SNPLT')
-        snplt.indata = uvdata
-        snplt.inext = 'SN'
-        snplt.opcode = 'ALIF'
-        snplt.invers = get_tab(uvdata,'SN')
-        snplt.nplots = 8
-        snplt.optype = i
-        snplt.go()
+    telescope = ['JB','ALL']
+    for k in [0,1]:
+        for i in optype:
+            snplt = AIPSTask('SNPLT')
+            snplt.indata = uvdata
+            snplt.inext = 'SN'
+            snplt.opcode = 'ALIF'
+            snplt.invers = get_tab(uvdata,'SN')-k
+            snplt.nplots = 8
+            snplt.optype = i
+            snplt.go()
+            print k
+            os.system('rm primary_phase_calibrator_%s_%s.ps' % (i ,telescope[k]))
+            lwpla = AIPSTask('LWPLA')
+            lwpla.indata = uvdata
+            lwpla.plver = 1
+            lwpla.invers = get_tab(uvdata,'PL')
+            lwpla.outfile = 'PWD:primary_phase_calibrator_%s_%s.ps' % (i ,telescope[k])
+            lwpla.go()
+            for j in range(get_tab(uvdata,'PL')):
+                uvdata.zap_table('PL',j)
 
-        os.system('rm primary_phase_calibrator_%s.ps' % i)
-        lwpla = AIPSTask('LWPLA')
-        lwpla.indata = uvdata
-        lwpla.plver = 1
-        lwpla.invers = get_tab(uvdata,'PL')
-        lwpla.outfile = 'PWD:primary_phase_calibrator_%s.ps' % i
-        lwpla.go()
-        for j in range(get_tab(uvdata,'PL')):
-            uvdata.zap_table('PL',j)
+def primary_calibrator_apply(uvdata,phase_cal,disk,refant):
+    x = get_tab(uvdata,'CL')
+    clcal = AIPSTask('CLCAL')
+    clcal.indata = uvdata
+    clcal.calsour[1] = phase_cal[0]
+    clcal.sources[1:] = phase_cal[1], target[0]
+    clcal.invers = get_tab(uvdata,'SN')-1
+    clcal.snver  = get_tab(uvdata,'SN')-1
+    clcal.gainver = x
+    clcal.gainuse = x+1
+    clcal.doblank = 1
+    clcal.dobtween = 1
+    clcal.interpol = 'AMBG'
+    clcal.opcode = 'CALP'
+    clcal.refant = refant
+    clcal.go()
+    clcal = AIPSTask('CLCAL')
+    clcal.indata = uvdata
+    clcal.calsour[1] = phase_cal[1]
+    clcal.sources[1] = target[0]
+    clcal.antennas[1] = 12
+    clcal.invers = get_tab(uvdata,'SN')
+    clcal.snver  = get_tab(uvdata,'SN')
+    clcal.gainver = x
+    clcal.gainuse = x+1
+    clcal.interpol = 'AMBG'
+    clcal.opcode = 'CALP'
+    clcal.refant = refant
+    clcal.go()
+
+    ### Then apply phase cal to themselves
+    clcal = AIPSTask('CLCAL')
+    clcal.indata = uvdata
+    clcal.calsour[1] = phase_cal[0]
+    clcal.sources[1] = phase_cal[0]
+    clcal.invers = get_tab(uvdata,'SN')-1
+    clcal.snver  = get_tab(uvdata,'SN')-1
+    clcal.gainver = x
+    clcal.gainuse = x+1
+    clcal.interpol = 'SELF'
+    clcal.opcode = 'CALP'
+    clcal.refant = refant
+    clcal.go()
+    clcal = AIPSTask('CLCAL')
+    clcal.indata = uvdata
+    clcal.calsour[1] = phase_cal[1]
+    clcal.sources[1] = phase_cal[1]
+    clcal.antennas[1] = 12
+    clcal.invers = get_tab(uvdata,'SN')
+    clcal.snver  = get_tab(uvdata,'SN')
+    clcal.gainver = x
+    clcal.gainuse = x+1
+    clcal.interpol = 'SELF'
+    clcal.opcode = 'CALP'
+    clcal.refant = refant
+    clcal.go()
