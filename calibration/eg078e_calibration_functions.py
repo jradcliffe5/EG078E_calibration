@@ -496,7 +496,7 @@ def primary_calibrator(uvdata,phase_cal,disk,refant):
             for j in range(get_tab(uvdata,'PL')):
                 uvdata.zap_table('PL',j)
 
-def primary_calibrator_apply(uvdata,phase_cal,disk,refant):
+def primary_calibrator_apply(uvdata,phase_cal,target,disk,refant):
     x = get_tab(uvdata,'CL')
     clcal = AIPSTask('CLCAL')
     clcal.indata = uvdata

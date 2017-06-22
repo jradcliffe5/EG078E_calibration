@@ -54,7 +54,8 @@ step_title = {1: 'Load, sort, dqual & index the data',
               5: 'Fringe fitting',
               6: 'Apply fringe fit solns.',
               7: 'Bandpass calibration',
-              8: 'Derive solutions for the primary phase calibrator'
+              8: 'Derive solutions for the primary phase calibrator',
+              9: 'Apply rate & phase to primary phase cal + JB'
 }
 thesteps = []
 for i in range(len(step_title)):
@@ -128,6 +129,11 @@ if(mystep in thesteps):
     print 'Step ', mystep, step_title[mystep]
     eg.primary_calibrator(uvdata,phase_cal,disk,refant)
 
+mystep = 9
+if(mystep in thesteps):
+    print 'Step ', mystep, step_title[mystep]
+    eg.primary_calibrator_apply(uvdata,phase_cal,target,disk,refant)
+    eg.tasaver(uvdata,'PHASE_RATE')
 
     #Large solution interval fringe fit so that phase IF offsets are removed
 #    fring = AIPSTask('FRING')
