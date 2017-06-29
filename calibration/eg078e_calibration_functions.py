@@ -441,7 +441,7 @@ def bpass(uvdata,bandpass,refant,disk):
         for j in range(get_tab(uvdata,'PL')):
             uvdata.zap_table('PL',j)
 
-def primary_calibrator(uvdata,phase_cal,disk,refant):
+def do_rates(uvdata,phase_cal,disk,refant):
     ## Derive phases & rates for all other telescopes on first phase cal makes SN8
     fring = AIPSTask('FRING')
     fring.indata = uvdata
@@ -454,27 +454,26 @@ def primary_calibrator(uvdata,phase_cal,disk,refant):
     fring.solint = 2 # ideally two points per scan now!
     fring.weightit = 1
     fring.aparm[1:] = 3,0,0,0,1,0,0,0,1
-    fring.dparm[1:]= 1,100,50,1,0,0,0,2
+    fring.dparm[1:]= 1,100,50,1,0,0,0,6
     fring.snver = get_tab(uvdata,'SN')+1
     fring.search[1:]=11,12
     fring.go()
-    ### Derive initial phases and rates for JB on second phase cal makes SN9 (edited with snedt)
+    ### Derive initial phases and rates on second phase cal makes SN9 and smoothed (edited with snedt)
     fring = AIPSTask('FRING')
     fring.indata = uvdata
     fring.calsour[1] = phase_cal[1]
-    fring.dofit[1] = 12
     fring.docalib = 2
     fring.gainuse = get_tab(uvdata,'CL')
     fring.refant = refant
-    fring.solint = 2
+    fring.solint = 3
     fring.weightit = 1
     fring.aparm[1:] = 3,0,0,0,1,0,0,0,1
-    fring.dparm[1:]= 1,100,5,1,0,0,0,2
+    fring.dparm[1:]= 1, 20, 0.01, 0, 0, 0, 0, 6
     fring.snver = get_tab(uvdata,'SN')+1
     fring.search[1:]=11,12
     fring.go()
-    optype = ['PHAS','RATE']
-    telescope = ['JB','ALL']
+    optype = ['RATE']
+    telescope = ['secondary','primary']
     for k in [0,1]:
         for i in optype:
             snplt = AIPSTask('SNPLT')
@@ -485,25 +484,58 @@ def primary_calibrator(uvdata,phase_cal,disk,refant):
             snplt.nplots = 8
             snplt.optype = i
             snplt.go()
-            print k
-            os.system('rm primary_phase_calibrator_%s_%s.ps' % (i ,telescope[k]))
+            os.system('rm %s_phase_calibrator_%s.ps' % (telescope[k],i))
             lwpla = AIPSTask('LWPLA')
             lwpla.indata = uvdata
             lwpla.plver = 1
             lwpla.invers = get_tab(uvdata,'PL')
-            lwpla.outfile = 'PWD:primary_phase_calibrator_%s_%s.ps' % (i ,telescope[k])
+            lwpla.outfile = 'PWD:%s_phase_calibrator_%s.ps' % (telescope[k],i)
             lwpla.go()
             for j in range(get_tab(uvdata,'PL')):
                 uvdata.zap_table('PL',j)
+    y = raw_input('Please snedt table.')
+    snsmo = AIPSTask('SNSMO')
+    snsmo.indata = uvdata
+    snsmo.sources[1] = phase_cal[1]
+    snsmo.dobtween = 1
+    snsmo.samptype = 'BOX'
+    snsmo.bparm[1:] = 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+    snsmo.cutoff = 0.5
+    snsmo.doblank = 0
+    snsmo.invers = get_tab(uvdata,'SN')
+    snsmo.refant = refant
+    snsmo.smotype = 'FULL'
+    snsmo.go()
+    optype = ['RATE']
+    for i in optype:
+        snplt = AIPSTask('SNPLT')
+        snplt.indata = uvdata
+        snplt.inext = 'SN'
+        snplt.opcode = 'ALIF'
+        snplt.invers = get_tab(uvdata,'SN')
+        snplt.nplots = 8
+        snplt.optype = i
+        snplt.go()
+        os.system('rm secondary_phase_calibrator_smooth_%s_.ps' % i)
+        lwpla = AIPSTask('LWPLA')
+        lwpla.indata = uvdata
+        lwpla.plver = 1
+        lwpla.invers = get_tab(uvdata,'PL')
+        lwpla.outfile = 'PWD:secondary_phase_calibrator_smooth_%s.ps' % i
+        lwpla.go()
+        for j in range(get_tab(uvdata,'PL')):
+            uvdata.zap_table('PL',j)
 
-def primary_calibrator_apply(uvdata,phase_cal,target,disk,refant):
+
+def do_rate_apply(uvdata,phase_cal,target,disk,refant):
     x = get_tab(uvdata,'CL')
+    no = 1
     clcal = AIPSTask('CLCAL')
     clcal.indata = uvdata
-    clcal.calsour[1] = phase_cal[0]
+    clcal.calsour[1] = phase_cal[1]
     clcal.sources[1:] = phase_cal[1], target[0]
-    clcal.invers = get_tab(uvdata,'SN')-1
-    clcal.snver  = get_tab(uvdata,'SN')-1
+    clcal.invers = get_tab(uvdata,'SN')-no
+    clcal.snver  = get_tab(uvdata,'SN')-no
     clcal.gainver = x
     clcal.gainuse = x+1
     clcal.doblank = 1
@@ -516,7 +548,7 @@ def primary_calibrator_apply(uvdata,phase_cal,target,disk,refant):
     clcal.indata = uvdata
     clcal.calsour[1] = phase_cal[1]
     clcal.sources[1] = target[0]
-    clcal.antennas[1] = 12
+    #clcal.antennas[1] = 12
     clcal.invers = get_tab(uvdata,'SN')
     clcal.snver  = get_tab(uvdata,'SN')
     clcal.gainver = x
@@ -531,8 +563,8 @@ def primary_calibrator_apply(uvdata,phase_cal,target,disk,refant):
     clcal.indata = uvdata
     clcal.calsour[1] = phase_cal[0]
     clcal.sources[1] = phase_cal[0]
-    clcal.invers = get_tab(uvdata,'SN')-1
-    clcal.snver  = get_tab(uvdata,'SN')-1
+    clcal.invers = get_tab(uvdata,'SN')-no
+    clcal.snver  = get_tab(uvdata,'SN')-no
     clcal.gainver = x
     clcal.gainuse = x+1
     clcal.interpol = 'SELF'
@@ -543,7 +575,7 @@ def primary_calibrator_apply(uvdata,phase_cal,target,disk,refant):
     clcal.indata = uvdata
     clcal.calsour[1] = phase_cal[1]
     clcal.sources[1] = phase_cal[1]
-    clcal.antennas[1] = 12
+    #clcal.antennas[1] = 12
     clcal.invers = get_tab(uvdata,'SN')
     clcal.snver  = get_tab(uvdata,'SN')
     clcal.gainver = x

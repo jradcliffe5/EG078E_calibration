@@ -127,7 +127,7 @@ if(mystep in thesteps):
 mystep = 8
 if(mystep in thesteps):
     print 'Step ', mystep, step_title[mystep]
-    eg.primary_calibrator(uvdata,phase_cal,disk,refant)
+    eg.do_rates(uvdata,phase_cal,disk,refant)
 
 mystep = 9
 if(mystep in thesteps):
