@@ -53,9 +53,9 @@ step_title = {1: 'Load, sort, dqual & index the data',
               4: 'Instrumental delay',
               5: 'Fringe fitting',
               6: 'Apply fringe fit solns.',
-              7: 'Bandpass calibration',
-              8: 'Derive solutions for the primary phase calibrator',
-              9: 'Apply rate & phase to primary phase cal + JB'
+              7: 'Do phase and rates',
+              8: 'Apply rates and phases',
+              9: 'Bandpass'
 }
 thesteps = []
 for i in range(len(step_title)):
@@ -98,7 +98,7 @@ if(mystep in thesteps):
 mystep = 3
 if(mystep in thesteps):
     print 'Step ', mystep, step_title[mystep]
-    eg.initial_flag(uvdata,tasav,disk,refant)
+    #eg.initial_flag(uvdata,tasav,disk,refant)
     eg.eg078e_specific_flagging(uvdata,tasav,disk,refant)
 
 mystep = 4
@@ -116,25 +116,38 @@ if(mystep in thesteps):
 mystep = 6
 if(mystep in thesteps):
     print 'Step ', mystep, step_title[mystep]
-    eg.applydelays(uvdata,disk,refant,bpass,phase_cal,target)
+    eg.applydelays_2(uvdata,disk,refant,bpass,phase_cal,target)
     eg.tasaver(uvdata,'DELAYS')
-
+'''
 mystep = 7
 if(mystep in thesteps):
     print 'Step ', mystep, step_title[mystep]
     eg.bpass(uvdata,bpass,refant,disk)
+'''
+mystep = 7
+if(mystep in thesteps):
+    print 'Step ', mystep, step_title[mystep]
+    eg.do_phase_rates(uvdata,disk,refant,bpass,phase_cal)
 
 mystep = 8
 if(mystep in thesteps):
     print 'Step ', mystep, step_title[mystep]
-    eg.do_rates(uvdata,phase_cal,disk,refant)
+    eg.apply_phase_rates(uvdata,disk,refant,bpass,phase_cal,target)
+
+## self-cal  on PC1
 
 mystep = 9
 if(mystep in thesteps):
     print 'Step ', mystep, step_title[mystep]
+    eg.bpass(uvdata,bpass,refant,disk)
+
+'''
+mystep = 8
+if(mystep in thesteps):
+    print 'Step ', mystep, step_title[mystep]
     eg.primary_calibrator_apply(uvdata,phase_cal,target,disk,refant)
     eg.tasaver(uvdata,'PHASE_RATE')
-
+'''
     #Large solution interval fringe fit so that phase IF offsets are removed
 #    fring = AIPSTask('FRING')
 #    uvdata.zap_table('SN',2)

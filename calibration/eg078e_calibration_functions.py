@@ -134,8 +134,6 @@ def amplitude_calibration_EVN(uvdata,tasav,disk,refant,sources,snedt_amp):
     clcal.refant = refant
     clcal.go()
 
-
-
 def initial_flag(uvdata,tasav,disk,refant):
     tacop = AIPSTask('TACOP')
     tacop.indata = tasav
@@ -173,18 +171,18 @@ def eg078e_specific_flagging(uvdata,tasav,disk,refant):
     clcor.clcorprm[1]=0.33
     clcor.go()
 
-def instrumental_delay(uvdata,disk,refant,bpass,phase_cal):
+def instrumental_delay(uvdata,disk,refant,bpass,phase_cal): ## Makes SN4 and CL3
     ## first fring is short timerange on DA193 as all telescopes see this source
     fring = AIPSTask('FRING')
     fring.indata = uvdata
     fring.calsour[1:] = bpass
-    #fring.timerang[1:] = 0,12,54,32,0,12,59,28
+    fring.timerang[1:] = 0,12,54,32,0,13,30,28
     fring.docalib = 2
     fring.gainuse = 0
     fring.refant = refant
     fring.solint = 5
     fring.aparm[1:] = 3,0
-    fring.dparm[9] = 1
+    fring.dparm[8] = 1
     fring.snver = get_tab(uvdata,'SN')+1
     fring.go()
 
@@ -213,13 +211,12 @@ def instrumental_delay(uvdata,disk,refant,bpass,phase_cal):
     clcal.gainver = get_tab(uvdata,'CL')
     clcal.gainuse = get_tab(uvdata,'CL')+1
     clcal.interpol = '2PT'
-    clcal.dobtween = 1
-    clcal.opcode = 'CALI'
+    clcal.opcode = 'CALP'
     clcal.refant = refant
     clcal.go()
 
 
-def dodelays(uvdata,disk,refant,bpass,phase_cal):
+def dodelays(uvdata,disk,refant,bpass,phase_cal): ## Makes SN5-8
     fring = AIPSTask('FRING')
     fring.indata = uvdata
     fring.calsour[1:] = bpass
@@ -228,8 +225,8 @@ def dodelays(uvdata,disk,refant,bpass,phase_cal):
     fring.refant = refant
     fring.solint = 1.5
     fring.weightit = 1
-    fring.aparm[1:] = 3,0,0,0,1,0,0,0,1
-    fring.dparm[1:]= 1,100,50,1,0,0,1
+    fring.aparm[1:] = 3,0,0,0,1
+    fring.dparm[1:]= 3,100,0,0,0,0,0,5
     fring.snver = get_tab(uvdata,'SN')+1
     fring.search[1:]=11,12
     fring.go()
@@ -263,24 +260,25 @@ def dodelays(uvdata,disk,refant,bpass,phase_cal):
     fring.docalib = 2
     fring.gainuse = get_tab(uvdata,'CL')
     fring.refant = refant
-    fring.solint = 20
+    fring.solint = 2
     fring.weightit = 1
-    fring.aparm[1:] = 3,0,0,0,1,0,0,0,1
-    fring.dparm[1:]= 1,200,50,1,0,0,1,5
+    fring.aparm[1:] = 3,0,0,0,1,
+    fring.dparm[1:]= 3,100,0,0,0,0,0,5
     fring.snver = get_tab(uvdata,'SN')+1
     fring.search[1:]=11,12
     fring.go()
+
     fring = AIPSTask('FRING')
     fring.indata = uvdata
     fring.calsour[1] = phase_cal[1]
-    fring.dofit[1] = 12
+    #fring.dofit[1] = 12
     fring.docalib = 2
     fring.gainuse = get_tab(uvdata,'CL')
     fring.refant = refant
     fring.solint = 5
     fring.weightit = 1
-    fring.aparm[1:] = 3,0,0,0,1,0,0,0,1
-    fring.dparm[1:]= 1,90,50,1,0,0,1,5
+    fring.aparm[1:] = 3,0,0,0,1,
+    fring.dparm[1:]= 3,90,0,1,0,0,1,5
     fring.snver = get_tab(uvdata,'SN')+1
     fring.search[1:]=11,12
     fring.go()
@@ -303,6 +301,58 @@ def dodelays(uvdata,disk,refant,bpass,phase_cal):
         lwpla.go()
         for j in range(get_tab(uvdata,'PL')):
             uvdata.zap_table('PL',j)
+
+
+
+def applydelays_2(uvdata,disk,refant,bpass,phase_cal,target): ## custom for EG078E
+    ## Need to TAPPE SN5+SN6+SN8 (which is snedt of SN7)
+    tappe = AIPSTask('TAPPE')
+    tappe.indata = uvdata
+    tappe.indisk = disk
+    tappe.inext = 'SN'
+    tappe.invers = 5
+    tappe.in2vers = 6
+    tappe.go() ## MAKES SN 9
+    tappe.invers = 8
+    tappe.in2vers = 9
+    tappe.go() ## MAKES SN 10
+    uvdata.zap_table('SN',9) ## Delete 9 and move 10 to 9
+
+    tacop = AIPSTask('TACOP')
+    tacop.indata = uvdata
+    tacop.outdata = uvdata
+    tacop.inext = 'SN'
+    tacop.ncount = 1
+    tacop.invers = 10
+    tacop.outvers = 9
+    tacop.go()
+    uvdata.zap_table('SN',10)
+
+    snsmo = AIPSTask('SNSMO')
+    snsmo.indata = uvdata
+    snsmo.sources[1] = '*'
+    snsmo.dobtween = 1
+    snsmo.samptype = 'BOX'
+    snsmo.bparm[1:] = 0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5
+    snsmo.cutoff = 0.5
+    snsmo.doblank = 0
+    snsmo.invers = get_tab(uvdata,'SN')
+    snsmo.refant = refant
+    snsmo.smotype = 'FULL'
+    snsmo.go()
+
+    clcal = AIPSTask('CLCAL')
+    clcal.indata = uvdata
+    clcal.opcode = 'CALP'
+    clcal.interpol = 'AMBG'
+    clcal.snver = get_tab(uvdata,'SN')
+    clcal.invers = get_tab(uvdata,'SN')
+    clcal.gainver = get_tab(uvdata,'CL')
+    clcal.gainuse = get_tab(uvdata,'CL')+1
+    clcal.cutoff = 60
+    clcal.dobtween = 1
+    clcal.refant = refant
+    clcal.go()
 
 
 def applydelays(uvdata,disk,refant,bpass,phase_cal,target):
@@ -398,12 +448,106 @@ def applydelays(uvdata,disk,refant,bpass,phase_cal,target):
         for j in range(get_tab(uvdata,'PL')):
             uvdata.zap_table('PL',j)
 
+def do_phase_rates(uvdata,disk,refant,bpass,phase_cal):
+    fring = AIPSTask('FRING')
+    fring.indata = uvdata
+    fring.calsour[1:] = bpass
+    fring.docalib = 2
+    fring.gainuse = get_tab(uvdata,'CL')
+    fring.refant = refant
+    fring.solint = 1.5
+    fring.weightit = 1
+    fring.aparm[1:] = 3,0,0,0,1
+    fring.dparm[1:]= 3,100,0.01,0,0,0,0,2,0
+    fring.snver = get_tab(uvdata,'SN')+1
+    fring.search[1:]=11,12
+    fring.go()
+
+    fring = AIPSTask('FRING')
+    fring.indata = uvdata
+    fring.calsour[1] = phase_cal[0]
+    fring.docalib = 2
+    fring.gainuse = get_tab(uvdata,'CL')
+    fring.refant = refant
+    fring.solint = 2
+    fring.weightit = 1
+    fring.aparm[1:] = 3,0,0,0,1,
+    fring.dparm[1:]= 3,100,0.01,0,0,0,0,2,0
+    fring.snver = get_tab(uvdata,'SN')+1
+    fring.search[1:]=11,12
+    fring.go()
+
+    fring = AIPSTask('FRING')
+    fring.indata = uvdata
+    fring.calsour[1] = phase_cal[1]
+    #fring.dofit[1] = 12
+    fring.docalib = 2
+    fring.gainuse = get_tab(uvdata,'CL')
+    fring.refant = refant
+    fring.solint = 2
+    fring.weightit = 1
+    fring.aparm[1:] = 3,0,0,0,1,
+    fring.dparm[1:]= 3,100,0.01,0,0,0,0,2,0
+    fring.snver = get_tab(uvdata,'SN')+1
+    fring.search[1:]=11,12
+    fring.go()
+
+def apply_phase_rates(uvdata,disk,refant,bpass,phase_cal,target):
+    tappe = AIPSTask('TAPPE')
+    tappe.indata = uvdata
+    tappe.indisk = disk
+    tappe.inext = 'SN'
+    tappe.invers = 11
+    tappe.in2vers = 14
+    tappe.go() ## MAKES SN 16
+    tappe.invers = 15
+    tappe.in2vers = 16
+    tappe.go() ## MAKES SN 17
+    uvdata.zap_table('SN',16) ## Delete 16 and move 17 to 16
+
+    tacop = AIPSTask('TACOP')
+    tacop.indata = uvdata
+    tacop.outdata = uvdata
+    tacop.inext = 'SN'
+    tacop.ncount = 1
+    tacop.invers = 17
+    tacop.outvers = 16
+    tacop.go()
+    uvdata.zap_table('SN',17)
+
+    snsmo = AIPSTask('SNSMO') ## makes SN17
+    snsmo.indata = uvdata
+    snsmo.sources[1] = '*'
+    snsmo.dobtween = 1
+    snsmo.samptype = 'BOX'
+    snsmo.bparm[1:] = 0.0,0.01,5,0,0,0,0.01,5,0,0
+    snsmo.cutoff = 0.5
+    snsmo.doblank = 0
+    snsmo.invers = get_tab(uvdata,'SN')
+    snsmo.refant = refant
+    snsmo.smotype = 'VLBI'
+    snsmo.go()
+
+    clcal = AIPSTask('CLCAL')
+    clcal.indata = uvdata
+    clcal.opcode = 'CALP'
+    clcal.interpol = 'AMBG'
+    clcal.snver = get_tab(uvdata,'SN')
+    clcal.invers = get_tab(uvdata,'SN')
+    clcal.gainver = get_tab(uvdata,'CL')
+    clcal.gainuse = get_tab(uvdata,'CL')+1
+    clcal.cutoff = 60
+    clcal.dobtween = 1
+    clcal.refant = refant
+    clcal.go()
+
 
 def bpass(uvdata,bandpass,refant,disk):
     bpass = AIPSTask('BPASS')
     bpass.indata = uvdata
     bpass.calsour[1:] = bandpass
     bpass.docalib = 2
+    bpass.solint = -1
     bpass.gainuse = get_tab(uvdata,'CL')
     bpass.bpassprm[1:] = 0,0,1,0,0,0,0,0,1,1
     bpass.soltype = 'L1R'
